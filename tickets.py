@@ -67,6 +67,26 @@ def getTrainType(args):
 
     return type_dict
 
+#: 获取服务器数据
+def queryHttpData(url):
+    #关闭请求验证提示
+    requests.packages.urllib3.disable_warnings()
+
+    try:
+    	return requests.get(url, verify=False)
+    except Exception, e:
+    	return ''
+
+def createRow(types, datas):
+    data_filter = (train_info for train_info in datas if types.get(train_info['station_train_code'][0]))
+    for row in data_filter:
+        train_no = Fore.RESET + row['station_train_code']
+	train_station = Fore.GREEN + row['start_station_name'] + Fore.RESET + '>>' + Fore.RED + row['end_station_name']
+	train_time = Fore.GREEN + row['start_time'] + Fore.RESET + '--' + Fore.RED + row['arrive_time']
+	train_lishi = Fore.RESET + row['lishi']
+
+	yield [train_no, train_station, train_time, train_lishi, row['swz_num'], row['zy_num'], row['ze_num'], row['rw_num'], row['yw_num'], row['yb_num'], row['yz_num'], row['wz_num']]
+
 @getParams
 def getTickets(args):
     if not args:
@@ -82,7 +102,6 @@ def getTickets(args):
     pt.padding_width = 1
     # pt.pt._set_field_names(headers)
 
-    types = getTrainType(args)
     #: print types
 
     query_date = getDate(args.get('<date>'))
@@ -91,23 +110,16 @@ def getTickets(args):
 
     #: 获取数据
     com_url = 'https://kyfw.12306.cn/otn/lcxxcx/query?purpose_codes=ADULT&queryDate=%s&from_station=%s&to_station=%s' % (query_date, stations.get(query_from), stations.get(query_to))
-
     #: print com_url
-
-    #关闭请求验证提示
-    requests.packages.urllib3.disable_warnings()
-
-    try:
-    	results = requests.get(com_url, verify=False)
-    except Exception, e:
-    	print '12306渣渣不响应!'
+    results = queryHttpData(com_url)
 
     if results and 200 == results.json()['httpstatus']:
 	datas = results.json()['data']['datas']
-        data_filter = [train_info for train_info in datas if types.get(train_info['station_train_code'][0])]
-	for row in data_filter:
-	    pt.add_row([Fore.CYAN + row['station_train_code'], Fore.RED + row['start_station_name'] + Fore.CYAN + '>>' + Fore.GREEN + row['end_station_name'], Fore.RED + row['start_time'] + Fore.CYAN + '--' + Fore.GREEN + row['arrive_time'], Fore.CYAN + row['lishi'], row['swz_num'], row['zy_num'], row['ze_num'], row['rw_num'], row['yw_num'], row['yb_num'], row['yz_num'], row['wz_num']])
-
+        #: print datas
+	types = getTrainType(args)
+	#: print types
+        for row in createRow(types, datas):
+	    pt.add_row(row)
 	print pt
     else:
         print 'get info fail!'
